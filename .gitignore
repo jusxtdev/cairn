@@ -1,0 +1,27 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# Go
+*.exe
+*.test
+*.out
+apps/api/bin/
+# air hot-reload output
+apps/api/tmp/
+/tmp/
+*.log
+
+# Frontend (for later)
+node_modules/
+dist/
+.next/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Docker volumes (if you ever bind-mount data)
+pgdata/
