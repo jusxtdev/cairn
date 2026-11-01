@@ -4,10 +4,14 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"github.com/jusxtdev/cairn/internal/httpx"
 )
 
 func health(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("OK"))
+	httpx.WriteJSONResponse(w, http.StatusOK, httpx.Response{
+		Status: true,
+		Message: "API is healthy",
+	})
 }
 
 func main(){
