@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
+	"log"
+	"net/http"
+
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"net/http"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jusxtdev/cairn/internal/auth"
+	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
 )
 
@@ -15,9 +21,41 @@ func health(w http.ResponseWriter, r *http.Request) {
 }
 
 func main(){
+	// load the environment variables
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+
+	// setup db
+	ctx := context.Background()
+	db, err := pgxpool.New(
+		ctx,
+		cfg.DatabaseURL,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.Ping(ctx); err != nil {
+		log.Fatal("Database connection failed:", err)
+	}
+
 	r := chi.NewRouter()
+	// modify the default WriteMethodNotAllowed
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteMethodNotAllowedResponse(w)
+	})
+
 	r.Use(middleware.Logger)
 	r.Get("/health", health)
 
-	http.ListenAndServe(":8080", r)
+	// initialize handlers
+	authHandler := auth.NewHandler(db, cfg)
+	// register routes
+	r.Route("/auth", authHandler.Routes)
+
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		log.Fatal(err)
+	}
 }
