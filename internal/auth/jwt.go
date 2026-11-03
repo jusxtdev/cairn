@@ -9,7 +9,7 @@ func GenerateJWT(userID string, jwtSecret []byte, jwtExpiration int) (string, er
 	jwtExpirationTime := time.Hour * time.Duration(jwtExpiration) // 72 hours
 	claims := jwt.MapClaims{
 		"sub": userID,
-		"exp": time.Now().Add(jwtExpirationTime ).Unix(), // Token expires in 72 hours
+		"exp": time.Now().Add(jwtExpirationTime).Unix(), // Token expires in 72 hours
 		"iat": time.Now().Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

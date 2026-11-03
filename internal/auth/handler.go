@@ -10,8 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jusxtdev/cairn/internal/httpx"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/jusxtdev/cairn/internal/config"
+	"github.com/jusxtdev/cairn/internal/httpx"
+	"github.com/jusxtdev/cairn/internal/user"
 )
 
 type Handler struct{
@@ -54,8 +57,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: fmt.Sprintf("error : %s", err.Error())})
 			return
 		}
-	}
-	if email == body.Email {
+	} else {
 		httpx.WriteJSONResponse(w, http.StatusConflict, httpx.Response{Status: false, Message: "email already exists"})
 		return
 	}
@@ -100,9 +102,83 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type LoginRequest struct {
+	Email string `json:"email"`
+	Password string `json:"password"`
+}
 func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
+	// decode response body
+	var body LoginRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&body)
+	if err != nil {
+		httpx.WriteJSONResponse(w, http.StatusBadRequest, httpx.Response{})
+		return
+	}
+
+	// check if user exists (lower case email)
+	body.Email = strings.ToLower(body.Email)
+	var user user.User
+	err = h.db.QueryRow(
+		r.Context(),
+		`SELECT id, email, password
+		FROM users
+		WHERE email = $1`,
+		body.Email,
+	).Scan(&user.Id, &user.Email, &user.PasswordHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows){
+			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{
+				Status: false,
+				Message: "User not found",
+			})
+			return
+		}
+		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
+			Status: false,
+			Message: "Internal Server Error",
+		})
+		return
+	}
+	
+	// compare password with hash
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(user.PasswordHash),
+		[]byte(body.Password),
+	)
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword){
+			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
+				Status: false,
+				Message: "wrong password",
+			})
+			return
+		}
+
+		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
+			Status: false,
+			Message: "password verification failed",
+		})
+		return
+	}
+
+	// generate JWT token if password matches
+	token, err := GenerateJWT(user.Id.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
+	if err != nil {
+		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
+			Status: false,
+			Message: fmt.Sprintf("error : %s", err.Error()),
+		})
+		return
+	}
+
+	// return JWT token in response
 	httpx.WriteJSONResponse(w, http.StatusOK, httpx.Response{
 		Status: true,
 		Message: "User logged in successfully",
+		Data: map[string]string{
+			"token": token,
+		},
 	})
 }

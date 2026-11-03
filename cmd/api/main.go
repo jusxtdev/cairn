@@ -1,5 +1,15 @@
 package main
 
+/*ROUGH LIST OF THINGS TO LEARN
+- clean api design and project structure
+- chi router
+- DB connection and usage
+- databases amd sql 
+- jwt authentication (header and cookie)
+- logging and error handling
+- basic redis caching
+*/
+
 import (
 	"context"
 	"log"
@@ -8,6 +18,7 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/jusxtdev/cairn/internal/auth"
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
@@ -21,13 +32,13 @@ func health(w http.ResponseWriter, r *http.Request) {
 }
 
 func main(){
-	// load the environment variables
+	// - - - load the environment variables - - -  
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	// setup db
+	// - - - setup db - - -
 	ctx := context.Background()
 	db, err := pgxpool.New(
 		ctx,
@@ -41,18 +52,20 @@ func main(){
 		log.Fatal("Database connection failed:", err)
 	}
 
+	// - - - setup router - - -
 	r := chi.NewRouter()
+
 	// modify the default WriteMethodNotAllowed
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteMethodNotAllowedResponse(w)
 	})
-
 	r.Use(middleware.Logger)
-	r.Get("/health", health)
 
-	// initialize handlers
+	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)
-	// register routes
+
+	// - - - register routes - - -
+	r.Get("/health", health)
 	r.Route("/auth", authHandler.Routes)
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
