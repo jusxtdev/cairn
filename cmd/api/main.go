@@ -4,7 +4,7 @@ package main
 - clean api design and project structure
 - chi router
 - DB connection and usage
-- databases amd sql 
+- databases amd sql
 - jwt authentication (header and cookie)
 - logging and error handling
 - basic redis caching
@@ -22,6 +22,7 @@ import (
 	"github.com/jusxtdev/cairn/internal/auth"
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
+	"github.com/jusxtdev/cairn/internal/user"
 )
 
 func health(w http.ResponseWriter, r *http.Request) {
@@ -63,10 +64,20 @@ func main(){
 
 	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)
+	userHandler := user.NewHandler()
 
 	// - - - register routes - - -
+	// public routes
 	r.Get("/health", health)
 	r.Route("/auth", authHandler.Routes)
+
+	// protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return auth.AuthenticationMiddleware(db, next)
+		})
+		r.Route("/users", userHandler.Routes)
+	} )
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
