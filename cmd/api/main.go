@@ -22,7 +22,7 @@ import (
 	"github.com/jusxtdev/cairn/internal/auth"
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
-	"github.com/jusxtdev/cairn/internal/user"
+	"github.com/jusxtdev/cairn/internal/users"
 )
 
 func health(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func main(){
 
 	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)
-	userHandler := user.NewHandler()
+	userHandler := users.NewHandler()
 
 	// - - - register routes - - -
 	// public routes
@@ -74,7 +74,7 @@ func main(){
 	// protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
-			return auth.AuthenticationMiddleware(db, next)
+			return auth.AuthenticationMiddleware(authHandler.UserService, next)
 		})
 		r.Route("/users", userHandler.Routes)
 	} )

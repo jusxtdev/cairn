@@ -14,16 +14,19 @@ import (
 
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
-	"github.com/jusxtdev/cairn/internal/user"
+	"github.com/jusxtdev/cairn/internal/users"
 )
 
 type Handler struct{
-	db *pgxpool.Pool
 	cfg *config.Config
+	UserService *users.UserService
 }
 
 func NewHandler(db *pgxpool.Pool, cfg *config.Config) *Handler{
-	return &Handler{db, cfg}
+	return &Handler{
+		cfg,
+		&users.UserService{Db: db},
+	}
 }
 
 type RegisterRequest struct {
@@ -44,20 +47,12 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 
 	// check if user exists (lower case email)
 	body.Email = strings.ToLower(body.Email)
-	var email string
-	err = h.db.QueryRow(
-		r.Context(),
-		"SELECT email FROM users WHERE email = $1",
-		body.Email,
-	).Scan(&email)
+	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// user does not exist, proceed with registration
-		} else {
-			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: fmt.Sprintf("error : %s", err.Error())})
-			return
-		}
-	} else {
+		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: fmt.Sprintf("error : %s", err.Error())})
+		return
+	}
+	if exists {
 		httpx.WriteJSONResponse(w, http.StatusConflict, httpx.Response{Status: false, Message: "email already exists"})
 		return
 	}
@@ -71,11 +66,13 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	// generate UUID
 	uuid := uuid.New()
 	// create user in db
-	query := `
-	INSERT INTO users (id, name, email, password)
-	VALUES ($1, $2, $3, $4) 
-	`
-	_, err = h.db.Exec(r.Context(), query, uuid, body.Name, body.Email, hashedPassword)
+	u := users.CreateUserInput{
+		Id: uuid,
+		Name: body.Name,
+		Email: body.Email,
+		HashedPassword: hashedPassword,
+	}
+	err = h.UserService.AddUser(r.Context(), u)
 	if err != nil {
 		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
 			Status: false,
@@ -119,8 +116,8 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 
 	// check if user exists (lower case email)
 	body.Email = strings.ToLower(body.Email)
-	var user user.User
-	err = h.db.QueryRow(
+	var user users.User
+	err = h.UserService.Db.QueryRow(
 		r.Context(),
 		`SELECT id, email, password
 		FROM users
@@ -140,6 +137,22 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 			Message: "Internal Server Error",
 		})
 		return
+	}
+	user, err = h.UserService.GetUserByEmail(r.Context(), body.Email)
+	if err != nil {
+		switch {
+		case errors.Is(err, users.ErrUserNotFound):
+			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{
+				Status: false,
+				Message: err.Error(),
+			})
+		default:
+			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
+				Status: false,
+				Message: "internal server error",
+			})
+		}
+		return 
 	}
 	
 	// compare password with hash

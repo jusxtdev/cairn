@@ -6,10 +6,9 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
-	"github.com/jusxtdev/cairn/internal/user"
+	"github.com/jusxtdev/cairn/internal/users"
 )
 
 func getJWTSecret(token *jwt.Token) (any, error) {
@@ -20,7 +19,7 @@ func getJWTSecret(token *jwt.Token) (any, error) {
 	return []byte(cfg.JWTSecret), err
 }
 
-func AuthenticationMiddleware(db *pgxpool.Pool, next http.Handler) http.Handler {
+func AuthenticationMiddleware(userService *users.UserService, next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
 		// read authorization header OR cookies
 		authHeader := r.Header.Get("Authorization")
@@ -56,7 +55,7 @@ func AuthenticationMiddleware(db *pgxpool.Pool, next http.Handler) http.Handler 
 		// extract userId
 		userId := claims.Subject
 		// check if user exists 
-		exists, err := user.CheckUserExists(db, r, userId)
+		exists, err := userService.CheckUserExistsById(r.Context(), userId)
 		if err != nil {
 			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: "internal server error"})
 			return
