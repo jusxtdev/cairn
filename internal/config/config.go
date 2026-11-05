@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -19,10 +19,10 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
+	slog.Debug("load .env")
 	var cfg Config
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
 		return nil, err
 	}
 	cfg.PostgresUser = os.Getenv("POSTGRES_USER")
@@ -37,5 +37,6 @@ func LoadConfig() (*Config, error) {
 			cfg.JWTExpiration = value
 		}
 	}
+	slog.Info("successfully loaded .env")
 	return &cfg, nil
 }

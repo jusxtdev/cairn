@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
+		slog.Error("could not decode register request body", "error", err)
 		httpx.WriteBadRequest(w)
 		return
 	}
@@ -47,10 +49,12 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	body.Email = strings.ToLower(body.Email)
 	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
+		slog.Error("could not check if user exists", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
 	if exists {
+		slog.Error("user already exists", "email", body.Email)
 		httpx.WriteJSONResponse(
 			w,
 			http.StatusConflict,
@@ -64,6 +68,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	// hash password
 	hashedPassword, err := HashPassword(body.Password)
 	if err != nil {
+		slog.Error("could not hash password", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
@@ -78,12 +83,14 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.UserService.AddUser(r.Context(), u)
 	if err != nil {
+		slog.Error("could not add user", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
 	// generate JWT token
 	token, err := GenerateJWT(uuid.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
+		slog.Error("could not generate JWT token", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
@@ -95,6 +102,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 			"token": token,
 		},
 	})
+	slog.Info("user registered successfully", "email", body.Email)
 }
 
 type LoginRequest struct {
@@ -108,6 +116,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
+		slog.Error("could not decode login request body", "error", err)
 		httpx.WriteBadRequest(w)
 		return
 	}
@@ -119,11 +128,13 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, users.ErrUserNotFound):
+			slog.Error("user not found", "email", body.Email)
 			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{
 				Status: false,
 				Message: err.Error(),
 			})
 		default:
+			slog.Error("could not get user by email", "error", err)
 			httpx.WriteInternalServerErr(w)
 		}
 		return 
@@ -135,14 +146,16 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 		[]byte(body.Password),
 	)
 	if err != nil {
+		
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword){
+			slog.Error("wrong password", "email", body.Email)
 			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
 				Status: false,
 				Message: "wrong password",
 			})
 			return
 		}
-
+		slog.Error("could not compare password hash", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
@@ -150,6 +163,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	// generate JWT token if password matches
 	token, err := GenerateJWT(user.Id.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
+		slog.Error("could not generate JWT token", "error", err)
 		httpx.WriteInternalServerErr(w)
 		return
 	}
@@ -162,4 +176,5 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 			"token": token,
 		},
 	})
+	slog.Info("user logged in successfully", "email", body.Email)
 }

@@ -13,6 +13,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/middleware"
@@ -22,6 +23,7 @@ import (
 	"github.com/jusxtdev/cairn/internal/auth"
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
+	"github.com/jusxtdev/cairn/internal/logger"
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
@@ -33,25 +35,33 @@ func health(w http.ResponseWriter, r *http.Request) {
 }
 
 func main(){
+	// - - - initialize logging - - -  
+	logger.InitLogger("app.log")
+
 	// - - - load the environment variables - - -  
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		return
 	}
 
 	// - - - setup db - - -
 	ctx := context.Background()
+	slog.Debug("setting up db pool")
 	db, err := pgxpool.New(
 		ctx,
 		cfg.DatabaseURL,
 	)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("db conenction failed", "error", err)
+		return
 	}
 	defer db.Close()
 	if err := db.Ping(ctx); err != nil {
-		log.Fatal("Database connection failed:", err)
+		slog.Error("db conenction failed", "error", err)
+		return
 	}
+	slog.Info("db connected successfully")
 
 	// - - - setup router - - -
 	r := chi.NewRouter()
@@ -61,6 +71,7 @@ func main(){
 		httpx.WriteMethodNotAllowedResponse(w)
 	})
 	r.Use(middleware.Logger)
+	r.Use(logger.LoggingMiddleware)
 
 	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)

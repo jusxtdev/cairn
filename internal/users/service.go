@@ -70,7 +70,7 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, e
 		ctx,
 		"SELECT * FROM users WHERE email=$1",
 		email,
-	).Scan(&user)
+	).Scan(&user.Id, &user.Name, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil{
 		if errors.Is(err, pgx.ErrNoRows){
 			return User{}, ErrUserNotFound
