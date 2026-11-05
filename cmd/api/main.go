@@ -36,7 +36,13 @@ func health(w http.ResponseWriter, r *http.Request) {
 
 func main(){
 	// - - - initialize logging - - -  
-	logger.InitLogger("app.log")
+	logfile, err := logger.InitLogger("app.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logfile.Close()
+
+	slog.Info("application started")
 
 	// - - - load the environment variables - - -  
 	cfg, err := config.LoadConfig()

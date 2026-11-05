@@ -6,21 +6,24 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func InitLogger(logfile string) error {
-	// logfile is created at logs/
-	// make sure logs/ folder exists
+func InitLogger(logfile string) (*lumberjack.Logger, error) {
 	logFolder := "logs"
+	if err := os.MkdirAll(logFolder, 0750); err != nil {
+        return nil, err
+    }
+
 	logfilePath := fmt.Sprintf("%s/%s", logFolder, logfile)
-	file, err := os.OpenFile(
-		logfilePath,
-		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
-		0644,
-	)
-	if err != nil {
-		return err
-	}
+	file := &lumberjack.Logger{
+        Filename:   logfilePath,
+        MaxSize:    100, // Maximum size in MB
+        MaxBackups: 3,   // Keep 3 old log files
+        MaxAge:     7,   // Keep old logs for 7 days
+        Compress:   true,
+    }
 
 	logger := slog.New(
 		slog.NewJSONHandler(file, &slog.HandlerOptions{
@@ -29,7 +32,7 @@ func InitLogger(logfile string) error {
 	)
 
 	slog.SetDefault(logger)
-	return nil
+	return file, nil
 }
 
 func LoggingMiddleware(next http.Handler) http.Handler {
