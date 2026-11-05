@@ -30,3 +30,19 @@ func WriteMethodNotAllowedResponse(w http.ResponseWriter) {
 		Message: "Method not allowed",
 	})
 }
+
+func WriteCustomErr(w http.ResponseWriter, err error) {}
+
+func WriteBadRequest(w http.ResponseWriter) {
+	WriteJSONResponse(w, http.StatusBadRequest, Response{
+		Status: false,
+		Message: "cannot decode json",
+	})
+}
+
+func WriteInternalServerErr(w http.ResponseWriter) {
+	WriteJSONResponse(w, http.StatusInternalServerError, Response{
+		Status: false,
+		Message: "internal server error",
+	})
+}

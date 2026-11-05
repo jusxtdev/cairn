@@ -3,12 +3,10 @@ package auth
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
@@ -41,7 +39,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusBadRequest, httpx.Response{})
+		httpx.WriteBadRequest(w)
 		return
 	}
 
@@ -49,18 +47,24 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	body.Email = strings.ToLower(body.Email)
 	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: fmt.Sprintf("error : %s", err.Error())})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 	if exists {
-		httpx.WriteJSONResponse(w, http.StatusConflict, httpx.Response{Status: false, Message: "email already exists"})
+		httpx.WriteJSONResponse(
+			w,
+			http.StatusConflict,
+			httpx.Response{
+				Status: false,
+				Message: "email already exists",
+			})
 		return
 	}
 
 	// hash password
 	hashedPassword, err := HashPassword(body.Password)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: fmt.Sprintf("error : %s", err.Error())})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 	// generate UUID
@@ -74,19 +78,13 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.UserService.AddUser(r.Context(), u)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-			Status: false,
-			Message: fmt.Sprintf("error : %s", err.Error()),
-		})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 	// generate JWT token
 	token, err := GenerateJWT(uuid.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-			Status: false,
-			Message: fmt.Sprintf("error : %s", err.Error()),
-		})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 
@@ -110,34 +108,13 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusBadRequest, httpx.Response{})
+		httpx.WriteBadRequest(w)
 		return
 	}
 
 	// check if user exists (lower case email)
 	body.Email = strings.ToLower(body.Email)
 	var user users.User
-	err = h.UserService.Db.QueryRow(
-		r.Context(),
-		`SELECT id, email, password
-		FROM users
-		WHERE email = $1`,
-		body.Email,
-	).Scan(&user.Id, &user.Email, &user.PasswordHash)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows){
-			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{
-				Status: false,
-				Message: "User not found",
-			})
-			return
-		}
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-			Status: false,
-			Message: "Internal Server Error",
-		})
-		return
-	}
 	user, err = h.UserService.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
 		switch {
@@ -147,10 +124,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 				Message: err.Error(),
 			})
 		default:
-			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-				Status: false,
-				Message: "internal server error",
-			})
+			httpx.WriteInternalServerErr(w)
 		}
 		return 
 	}
@@ -169,20 +143,14 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-			Status: false,
-			Message: "password verification failed",
-		})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 
 	// generate JWT token if password matches
 	token, err := GenerateJWT(user.Id.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{
-			Status: false,
-			Message: fmt.Sprintf("error : %s", err.Error()),
-		})
+		httpx.WriteInternalServerErr(w)
 		return
 	}
 

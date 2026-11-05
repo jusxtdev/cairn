@@ -51,13 +51,14 @@ func AuthenticationMiddleware(userService *users.UserService, next http.Handler)
 				Status: false,
 				Message: "Invalid token",
 			})
+			return
 		}
 		// extract userId
 		userId := claims.Subject
 		// check if user exists 
 		exists, err := userService.CheckUserExistsById(r.Context(), userId)
 		if err != nil {
-			httpx.WriteJSONResponse(w, http.StatusInternalServerError, httpx.Response{Status: false, Message: "internal server error"})
+			httpx.WriteInternalServerErr(w)
 			return
 		}
 		if !exists {
