@@ -78,3 +78,19 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, e
 	}
 	return user, nil
 }
+
+func (s *UserService) GetUserById(ctx context.Context, id string) (User, error) {
+	var user User
+	err := s.Db.QueryRow(
+		ctx,
+		"SELECT * FROM users WHERE id=$1",
+		id,
+	).Scan(&user.Id, &user.Name, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrUserNotFound
+		}
+		return User{}, err
+	}
+	return user, nil
+}

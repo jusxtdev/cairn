@@ -81,7 +81,7 @@ func main(){
 
 	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)
-	userHandler := users.NewHandler()
+	userHandler := users.NewHandler(db)
 
 	// - - - register routes - - -
 	// public routes
