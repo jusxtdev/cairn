@@ -29,22 +29,6 @@ func NewHandler(db *pgxpool.Pool, cfg *config.Config) *Handler{
 	}
 }
 
-func (h *Handler)fail(w http.ResponseWriter, err error){
-	switch {
-	case errors.Is(err, ErrBadRequest):
-		slog.Warn(err.Error())
-		httpx.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, ErrEmailAlreadyExists):
-		slog.Warn(err.Error())
-		httpx.WriteErrorResponse(w, http.StatusConflict, err.Error())
-	case errors.Is(err, ErrInvalidCredentials):
-		slog.Warn(err.Error())
-		httpx.WriteErrorResponse(w, http.StatusUnauthorized, err.Error())
-	default:
-		slog.Error(err.Error())
-		httpx.WriteErrorResponse(w, http.StatusInternalServerError, "internal server error")
-	}
-}
 
 type RegisterRequest struct {
 	Name string `json:"name"`
@@ -58,7 +42,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		h.fail(w, ErrBadRequest)
+		fail(w, ErrBadRequest)
 		return
 	}
 
@@ -66,18 +50,18 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	body.Email = strings.ToLower(body.Email)
 	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
-		h.fail(w, fmt.Errorf("could not check if user exists : %w", err))
+		fail(w, fmt.Errorf("could not check if user exists : %w", err))
 		return
 	}
 	if exists {
-		h.fail(w, ErrEmailAlreadyExists)
+		fail(w, ErrEmailAlreadyExists)
 		return
 	}
 
 	// hash password
 	hashedPassword, err := HashPassword(body.Password)
 	if err != nil {
-		h.fail(w, fmt.Errorf("could not hash password : %w", err))
+		fail(w, fmt.Errorf("could not hash password : %w", err))
 		return
 	}
 	// generate UUID
@@ -91,13 +75,13 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.UserService.AddUser(r.Context(), u)
 	if err != nil {
-		h.fail(w, fmt.Errorf("could not add user : %w", err))
+		fail(w, fmt.Errorf("could not add user : %w", err))
 		return
 	}
 	// generate JWT token
 	token, err := GenerateJWT(uuid.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		h.fail(w, fmt.Errorf("could not generate JWT token : %w", err))
+		fail(w, fmt.Errorf("could not generate JWT token : %w", err))
 		return
 	}
 	
@@ -123,7 +107,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		h.fail(w, ErrBadRequest)
+		fail(w, ErrBadRequest)
 		return
 	}
 
@@ -134,10 +118,10 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, users.ErrUserNotFound):
-			h.fail(w, ErrInvalidCredentials)
+			fail(w, ErrInvalidCredentials)
 			return
 		default:
-			h.fail(w, fmt.Errorf("could not get user by email : %w", err))
+			fail(w, fmt.Errorf("could not get user by email : %w", err))
 		}
 		return 
 	}
@@ -150,17 +134,17 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword){
-			h.fail(w, ErrInvalidCredentials)
+			fail(w, ErrInvalidCredentials)
 			return
 		}
-		h.fail(w, fmt.Errorf("could not compare password hash : %w", err))
+		fail(w, fmt.Errorf("could not compare password hash : %w", err))
 		return
 	}
 	
 	// generate JWT token if password matches
 	token, err := GenerateJWT(user.Id.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		h.fail(w, fmt.Errorf("could not generate JWT token : %w", err))
+		fail(w, fmt.Errorf("could not generate JWT token : %w", err))
 		return
 	}
 

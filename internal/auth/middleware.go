@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -11,31 +12,46 @@ import (
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
+func getTokenFromHeader(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == ""{
+		return "", nil
+	}
+
+	parts := strings.Split(authHeader, " ") 
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", ErrInvalidAuthCredentials
+	}
+	return parts[1], nil
+}
+
 func AuthenticationMiddleware(userService *users.UserService, cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
 		// read authorization header OR cookies
-		// cookie, err := r.Cookie("token")
-		
-
-
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
-				Status: false,
-				Message: "invalid authorization header",
-			})
-			return 
+		var token string
+		cookie, err := GetJWTCookie(r)
+		if err != nil {
+			fail(w, err)
+			return
 		}
-		parts := strings.Split(authHeader, " ") 
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
-				Status: false,
-				Message: "invalid authorization header",
-			})
-			return 
+		fmt.Println("cookie: ", cookie)
+
+		if cookie != "" {
+			token = cookie
+		} else {
+			// if cookie is not provided, use auth header
+			authtoken, err :=getTokenFromHeader(r)
+			if err != nil{
+				fail(w, err)
+				return 
+			} 
+			if authtoken == "" {
+				fail(w, ErrMissingCredentials)
+				return
+			}
+			token = authtoken
 		}
 
-		token := parts[1]
 		// decode token
 		claims := &jwt.RegisteredClaims{}
 		decoded, err := jwt.ParseWithClaims(
@@ -49,7 +65,7 @@ func AuthenticationMiddleware(userService *users.UserService, cfg *config.Config
 		if err != nil || !decoded.Valid {
 			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
 				Status: false,
-				Message: "Invalid token",
+				Message: "invalid token",
 			})
 			return
 		}
