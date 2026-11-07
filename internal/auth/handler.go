@@ -19,13 +19,13 @@ import (
 
 type Handler struct{
 	cfg *config.Config
-	UserService *users.UserService
+	UserRepository *users.UserRepository
 }
 
 func NewHandler(db *pgxpool.Pool, cfg *config.Config) *Handler{
 	return &Handler{
 		cfg,
-		&users.UserService{Db: db},
+		&users.UserRepository{Db: db},
 	}
 }
 
@@ -48,7 +48,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 
 	// check if user exists (lower case email)
 	body.Email = strings.ToLower(body.Email)
-	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
+	exists, err := h.UserRepository.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
 		fail(w, fmt.Errorf("could not check if user exists : %w", err))
 		return
@@ -73,7 +73,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 		Email: body.Email,
 		HashedPassword: hashedPassword,
 	}
-	err = h.UserService.AddUser(r.Context(), u)
+	err = h.UserRepository.AddUser(r.Context(), u)
 	if err != nil {
 		fail(w, fmt.Errorf("could not add user : %w", err))
 		return
@@ -114,7 +114,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	// check if user exists (lower case email)
 	body.Email = strings.ToLower(body.Email)
 	var user users.User
-	user, err = h.UserService.GetUserByEmail(r.Context(), body.Email)
+	user, err = h.UserRepository.GetUserByEmail(r.Context(), body.Email)
 	if err != nil {
 		switch {
 		case errors.Is(err, users.ErrUserNotFound):

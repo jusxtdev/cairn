@@ -25,7 +25,7 @@ func getTokenFromHeader(r *http.Request) (string, error) {
 	return parts[1], nil
 }
 
-func AuthenticationMiddleware(userService *users.UserService, cfg *config.Config, next http.Handler) http.Handler {
+func AuthenticationMiddleware(userRepository *users.UserRepository, cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
 		// read authorization header OR cookies
 		var token string
@@ -72,7 +72,7 @@ func AuthenticationMiddleware(userService *users.UserService, cfg *config.Config
 		// extract userId
 		userId := claims.Subject
 		// check if user exists 
-		exists, err := userService.CheckUserExistsById(r.Context(), userId)
+		exists, err := userRepository.CheckUserExistsById(r.Context(), userId)
 		if err != nil {
 			httpx.WriteInternalServerErr(w)
 			return

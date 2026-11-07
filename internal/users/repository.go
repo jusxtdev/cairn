@@ -9,11 +9,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type UserService struct {
+type UserRepository struct {
 	Db *pgxpool.Pool
 }
 
-func (s *UserService) CheckUserExistsById(ctx context.Context, id string) (bool, error) {
+func (s *UserRepository) CheckUserExistsById(ctx context.Context, id string) (bool, error) {
 	// MISTAKE :- used gotId as int, which resulted in 0 when doing Scan
 	// FIX :- know what data types are coming in and out of a process you are calling and use the variables accordingly
 	var gotId string
@@ -34,7 +34,7 @@ func (s *UserService) CheckUserExistsById(ctx context.Context, id string) (bool,
 // function that finds user with the provided id
 // throws error only if something happens from db.QueryRow
 // let caller handle userNotFound
-func (s *UserService) CheckUserExistsByEmail(ctx context.Context, email string) (bool, error) {
+func (s *UserRepository) CheckUserExistsByEmail(ctx context.Context, email string) (bool, error) {
 	var exists bool
 	err := s.Db.QueryRow(
 		ctx,
@@ -54,7 +54,7 @@ type CreateUserInput struct {
 	HashedPassword string
 }
 
-func (s *UserService) AddUser(ctx context.Context, u CreateUserInput) error {
+func (s *UserRepository) AddUser(ctx context.Context, u CreateUserInput) error {
 	query := `
 	INSERT INTO users (id, name, email, password)
 	VALUES ($1, $2, $3, $4) 
@@ -63,7 +63,7 @@ func (s *UserService) AddUser(ctx context.Context, u CreateUserInput) error {
 	return err
 }
 
-func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, error) {
+func (s *UserRepository) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	var user User
 	err := s.Db.QueryRow(
 		ctx,
@@ -79,7 +79,7 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, e
 	return user, nil
 }
 
-func (s *UserService) GetUserById(ctx context.Context, id string) (User, error) {
+func (s *UserRepository) GetUserById(ctx context.Context, id string) (User, error) {
 	var user User
 	err := s.Db.QueryRow(
 		ctx,

@@ -9,12 +9,12 @@ import (
 )
 
 type Handler struct {
-	UserService *UserService
+	UserRepository *UserRepository
 }
 
 func NewHandler(db *pgxpool.Pool) *Handler {
 	return &Handler{
-		&UserService{
+		&UserRepository{
 			Db: db,
 		},
 	}
@@ -26,7 +26,7 @@ func (h *Handler)GetMe(w http.ResponseWriter, r *http.Request) {
 		fail(w, errors.New("user id missing from request context"))
 		return
 	}
-	user, err := h.UserService.GetUserById(r.Context(), userId)
+	user, err := h.UserRepository.GetUserById(r.Context(), userId)
 	if err != nil {
 		fail(w, err)
 		return
