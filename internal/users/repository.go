@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -48,19 +47,23 @@ func (s *UserRepository) CheckUserExistsByEmail(ctx context.Context, email strin
 }
 
 type CreateUserInput struct {
-	Id             uuid.UUID
 	Name           string
 	Email          string
 	HashedPassword string
 }
 
-func (s *UserRepository) AddUser(ctx context.Context, u CreateUserInput) error {
+func (s *UserRepository) AddUser(ctx context.Context, u CreateUserInput) (string, error) {
 	query := `
-	INSERT INTO users (id, name, email, password)
-	VALUES ($1, $2, $3, $4) 
+	INSERT INTO users (name, email, password)
+	VALUES ($1, $2, $3) 
+	RETURNING id
 	`
-	_, err := s.Db.Exec(ctx, query, u.Id, u.Name, u.Email, u.HashedPassword)
-	return err
+	var id string
+	err := s.Db.QueryRow(ctx, query, u.Name, u.Email, u.HashedPassword).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (s *UserRepository) GetUserByEmail(ctx context.Context, email string) (User, error) {

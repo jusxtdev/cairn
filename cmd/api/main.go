@@ -24,6 +24,7 @@ import (
 	"github.com/jusxtdev/cairn/internal/config"
 	"github.com/jusxtdev/cairn/internal/httpx"
 	"github.com/jusxtdev/cairn/internal/logger"
+	"github.com/jusxtdev/cairn/internal/projects"
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
@@ -82,19 +83,32 @@ func main(){
 	// - - - initialize handlers - - -
 	authHandler := auth.NewHandler(db, cfg)
 	userHandler := users.NewHandler(db)
+	projectsHandler := projects.NewHandler(db)
 
 	// - - - register routes - - -
 	// public routes
 	r.Get("/health", health)
 	r.Route("/auth", authHandler.Routes)
 
-	// protected routes
+	// users routes
 	r.Group(func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return auth.AuthenticationMiddleware(authHandler.UserRepository, cfg, next)
 		})
 		r.Route("/users", userHandler.Routes)
 	} )
+	
+	// projects routes
+	r.Route("/projects", func(r chi.Router) {
+		// protected
+		r.Group(func(r chi.Router) {
+			r.Use(func(next http.Handler) http.Handler {
+				return auth.AuthenticationMiddleware(authHandler.UserRepository, cfg, next)
+			})
+
+			projectsHandler.ProtectedRoutes(r)
+		})
+	})
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)

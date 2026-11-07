@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
@@ -64,22 +63,19 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 		fail(w, fmt.Errorf("could not hash password : %w", err))
 		return
 	}
-	// generate UUID
-	uuid := uuid.New()
 	// create user in db
 	u := users.CreateUserInput{
-		Id: uuid,
 		Name: body.Name,
 		Email: body.Email,
 		HashedPassword: hashedPassword,
 	}
-	err = h.UserRepository.AddUser(r.Context(), u)
+	userId, err := h.UserRepository.AddUser(r.Context(), u)
 	if err != nil {
 		fail(w, fmt.Errorf("could not add user : %w", err))
 		return
 	}
 	// generate JWT token
-	token, err := GenerateJWT(uuid.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
+	token, err := GenerateJWT(userId, []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
 		fail(w, fmt.Errorf("could not generate JWT token : %w", err))
 		return
