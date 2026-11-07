@@ -13,8 +13,6 @@ type UserService struct {
 	Db *pgxpool.Pool
 }
 
-var ErrUserNotFound = errors.New("user not found")
-
 func (s *UserService) CheckUserExistsById(ctx context.Context, id string) (bool, error) {
 	// MISTAKE :- used gotId as int, which resulted in 0 when doing Scan
 	// FIX :- know what data types are coming in and out of a process you are calling and use the variables accordingly
@@ -25,7 +23,7 @@ func (s *UserService) CheckUserExistsById(ctx context.Context, id string) (bool,
 		id,
 	).Scan(&gotId)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows){
+		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -50,18 +48,19 @@ func (s *UserService) CheckUserExistsByEmail(ctx context.Context, email string) 
 }
 
 type CreateUserInput struct {
-	Id       uuid.UUID
-	Name     string
-	Email    string
+	Id             uuid.UUID
+	Name           string
+	Email          string
 	HashedPassword string
 }
+
 func (s *UserService) AddUser(ctx context.Context, u CreateUserInput) error {
-		query := `
+	query := `
 	INSERT INTO users (id, name, email, password)
 	VALUES ($1, $2, $3, $4) 
 	`
 	_, err := s.Db.Exec(ctx, query, u.Id, u.Name, u.Email, u.HashedPassword)
-	return  err
+	return err
 }
 
 func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -71,11 +70,11 @@ func (s *UserService) GetUserByEmail(ctx context.Context, email string) (User, e
 		"SELECT * FROM users WHERE email=$1",
 		email,
 	).Scan(&user.Id, &user.Name, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
-	if err != nil{
-		if errors.Is(err, pgx.ErrNoRows){
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return User{}, ErrUserNotFound
 		}
 		return User{}, err
-	} 
+	}
 	return user, nil
 }

@@ -91,7 +91,7 @@ func main(){
 	// protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
-			return auth.AuthenticationMiddleware(authHandler.UserService, next)
+			return auth.AuthenticationMiddleware(authHandler.UserService, cfg, next)
 		})
 		r.Route("/users", userHandler.Routes)
 	} )

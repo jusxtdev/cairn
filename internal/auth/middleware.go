@@ -11,17 +11,13 @@ import (
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
-func getJWTSecret(token *jwt.Token) (any, error) {
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return nil, err
-	}
-	return []byte(cfg.JWTSecret), err
-}
-
-func AuthenticationMiddleware(userService *users.UserService, next http.Handler) http.Handler {
+func AuthenticationMiddleware(userService *users.UserService, cfg *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request){
 		// read authorization header OR cookies
+		// cookie, err := r.Cookie("token")
+		
+
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
@@ -38,15 +34,19 @@ func AuthenticationMiddleware(userService *users.UserService, next http.Handler)
 			})
 			return 
 		}
-		// extract token
+
+		token := parts[1]
+		// decode token
 		claims := &jwt.RegisteredClaims{}
-		token, err := jwt.ParseWithClaims(
-			parts[1],
+		decoded, err := jwt.ParseWithClaims(
+			token,
 			claims,
-			getJWTSecret,
+			func(t *jwt.Token) (any, error) {
+				return []byte(cfg.JWTSecret), nil
+			},
 			jwt.WithExpirationRequired(),
 		)
-		if err != nil || !token.Valid {
+		if err != nil || !decoded.Valid {
 			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
 				Status: false,
 				Message: "Invalid token",

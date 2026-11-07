@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -28,6 +29,23 @@ func NewHandler(db *pgxpool.Pool, cfg *config.Config) *Handler{
 	}
 }
 
+func (h *Handler)fail(w http.ResponseWriter, err error){
+	switch {
+	case errors.Is(err, ErrBadRequest):
+		slog.Warn(err.Error())
+		httpx.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, ErrEmailAlreadyExists):
+		slog.Warn(err.Error())
+		httpx.WriteErrorResponse(w, http.StatusConflict, err.Error())
+	case errors.Is(err, ErrInvalidCredentials):
+		slog.Warn(err.Error())
+		httpx.WriteErrorResponse(w, http.StatusUnauthorized, err.Error())
+	default:
+		slog.Error(err.Error())
+		httpx.WriteErrorResponse(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
 type RegisterRequest struct {
 	Name string `json:"name"`
 	Email string `json:"email"`
@@ -40,8 +58,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		slog.Error("could not decode register request body", "error", err)
-		httpx.WriteBadRequest(w)
+		h.fail(w, ErrBadRequest)
 		return
 	}
 
@@ -49,27 +66,18 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	body.Email = strings.ToLower(body.Email)
 	exists, err := h.UserService.CheckUserExistsByEmail(r.Context(), body.Email)
 	if err != nil {
-		slog.Error("could not check if user exists", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not check if user exists : %w", err))
 		return
 	}
 	if exists {
-		slog.Error("user already exists", "email", body.Email)
-		httpx.WriteJSONResponse(
-			w,
-			http.StatusConflict,
-			httpx.Response{
-				Status: false,
-				Message: "email already exists",
-			})
+		h.fail(w, ErrEmailAlreadyExists)
 		return
 	}
 
 	// hash password
 	hashedPassword, err := HashPassword(body.Password)
 	if err != nil {
-		slog.Error("could not hash password", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not hash password : %w", err))
 		return
 	}
 	// generate UUID
@@ -83,18 +91,17 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.UserService.AddUser(r.Context(), u)
 	if err != nil {
-		slog.Error("could not add user", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not add user : %w", err))
 		return
 	}
 	// generate JWT token
 	token, err := GenerateJWT(uuid.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		slog.Error("could not generate JWT token", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not generate JWT token : %w", err))
 		return
 	}
-
+	
+	SetJWTCookie(w, token, h.cfg)
 	httpx.WriteJSONResponse(w, http.StatusOK, httpx.Response{
 		Status: true,
 		Message: "User registered successfully",
@@ -116,8 +123,7 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&body)
 	if err != nil {
-		slog.Error("could not decode login request body", "error", err)
-		httpx.WriteBadRequest(w)
+		h.fail(w, ErrBadRequest)
 		return
 	}
 
@@ -128,14 +134,10 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, users.ErrUserNotFound):
-			slog.Error("user not found", "email", body.Email)
-			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{
-				Status: false,
-				Message: err.Error(),
-			})
+			h.fail(w, ErrInvalidCredentials)
+			return
 		default:
-			slog.Error("could not get user by email", "error", err)
-			httpx.WriteInternalServerErr(w)
+			h.fail(w, fmt.Errorf("could not get user by email : %w", err))
 		}
 		return 
 	}
@@ -148,25 +150,21 @@ func (h *Handler)Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword){
-			slog.Error("wrong password", "email", body.Email)
-			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
-				Status: false,
-				Message: "wrong password",
-			})
+			h.fail(w, ErrInvalidCredentials)
 			return
 		}
-		slog.Error("could not compare password hash", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not compare password hash : %w", err))
 		return
 	}
-
+	
 	// generate JWT token if password matches
 	token, err := GenerateJWT(user.Id.String(), []byte(h.cfg.JWTSecret), h.cfg.JWTExpiration)
 	if err != nil {
-		slog.Error("could not generate JWT token", "error", err)
-		httpx.WriteInternalServerErr(w)
+		h.fail(w, fmt.Errorf("could not generate JWT token : %w", err))
 		return
 	}
+
+	SetJWTCookie(w, token, h.cfg)
 
 	// return JWT token in response
 	httpx.WriteJSONResponse(w, http.StatusOK, httpx.Response{

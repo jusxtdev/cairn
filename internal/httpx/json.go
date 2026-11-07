@@ -31,8 +31,6 @@ func WriteMethodNotAllowedResponse(w http.ResponseWriter) {
 	})
 }
 
-func WriteCustomErr(w http.ResponseWriter, err error) {}
-
 func WriteBadRequest(w http.ResponseWriter) {
 	WriteJSONResponse(w, http.StatusBadRequest, Response{
 		Status: false,
