@@ -12,7 +12,7 @@ require (
 	golang.org/x/crypto v0.58.0
 )
 
-require github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6 // indirect
+require github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6 
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

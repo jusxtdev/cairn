@@ -16,7 +16,7 @@ type Config struct {
 	DatabaseURL string `env:"DATABASE_URL,required"`
 	JWTSecret   string `env:"JWT_SECRET"`
 	JWTExpiration int    `env:"JWT_EXPIRATION"`
-	Env string `env:"ENV,default=development"`
+	Env string `env:"ENV"`
 }
 
 func LoadConfig() (*Config, error) {

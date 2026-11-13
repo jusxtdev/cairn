@@ -78,6 +78,7 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &pgErr){
 			if pgErr.Code == pgerrcode.UniqueViolation {
 				fail(w, ErrEmailAlreadyExists)
+				return
 			}
 		}
 

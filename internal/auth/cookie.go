@@ -10,7 +10,10 @@ import (
 var TokenName = "token"
 
 func SetJWTCookie(w http.ResponseWriter, token string, cfg *config.Config){
-	secure := cfg.Env == "production"
+	secure := false
+	if cfg.Env == "production" {
+		secure = true
+	}
 	
 	cookie := &http.Cookie{
 		Name: TokenName,
