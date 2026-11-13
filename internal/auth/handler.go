@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
@@ -71,6 +73,14 @@ func (h *Handler)Register(w http.ResponseWriter, r *http.Request) {
 	}
 	userId, err := h.UserRepository.AddUser(r.Context(), u)
 	if err != nil {
+		// to prevent concurrent writes, check SQL key constraint error 23505
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr){
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				fail(w, ErrEmailAlreadyExists)
+			}
+		}
+
 		fail(w, fmt.Errorf("could not add user : %w", err))
 		return
 	}

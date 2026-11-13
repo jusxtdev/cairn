@@ -10,12 +10,14 @@ import (
 var TokenName = "token"
 
 func SetJWTCookie(w http.ResponseWriter, token string, cfg *config.Config){
+	secure := cfg.Env == "production"
+	
 	cookie := &http.Cookie{
 		Name: TokenName,
 		Value: token,
 		Expires: time.Now().Add(time.Hour * time.Duration(cfg.JWTExpiration)),
 		HttpOnly: true,
-		Secure : true,
+		Secure : secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)

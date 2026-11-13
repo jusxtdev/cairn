@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -34,7 +33,6 @@ func AuthenticationMiddleware(userRepository *users.UserRepository, cfg *config.
 			fail(w, err)
 			return
 		}
-		fmt.Println("cookie: ", cookie)
 
 		if cookie != "" {
 			token = cookie
