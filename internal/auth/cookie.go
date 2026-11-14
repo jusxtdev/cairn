@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ func SetJWTCookie(w http.ResponseWriter, token string, cfg *config.Config){
 func GetJWTCookie(r *http.Request) (string, error) {
 	cookie, err := r.Cookie(TokenName)
 	if err != nil {
-		if err == http.ErrNoCookie {
+		if errors.Is(err, http.ErrNoCookie) {
 			return "", nil
 		}
 		return "", err

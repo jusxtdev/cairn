@@ -23,3 +23,10 @@ func WriteJSONResponse(w http.ResponseWriter, statusCode int, data Response) {
 		fmt.Println(err)
 	}
 }
+
+func WriteMethodNotAllowedResponse(w http.ResponseWriter) {
+	WriteJSONResponse(w, http.StatusMethodNotAllowed, Response{
+		Status: false,
+		Message: "Method not allowed",
+	})
+}
