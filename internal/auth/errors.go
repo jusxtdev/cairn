@@ -14,6 +14,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrMissingCredentials = errors.New("authentication credentials are required")
     ErrInvalidAuthCredentials = errors.New("invalid authentication credentials")
+	ErrUserNotFound = errors.New("user not found")
 )
 
 func fail(w http.ResponseWriter, err error){
@@ -33,6 +34,9 @@ func fail(w http.ResponseWriter, err error){
 	case errors.Is(err, ErrInvalidAuthCredentials):
 		slog.Warn(err.Error())
 		httpx.WriteErrorResponse(w, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, ErrUserNotFound):
+		slog.Warn(err.Error())
+		httpx.WriteErrorResponse(w, http.StatusNotFound, err.Error())
 	default:
 		slog.Error(err.Error())
 		httpx.WriteErrorResponse(w, http.StatusInternalServerError, "internal server error")

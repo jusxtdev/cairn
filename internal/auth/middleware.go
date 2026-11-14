@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jusxtdev/cairn/internal/config"
-	"github.com/jusxtdev/cairn/internal/httpx"
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
@@ -61,10 +60,7 @@ func AuthenticationMiddleware(userRepository *users.UserRepository, cfg *config.
 			jwt.WithExpirationRequired(),
 		)
 		if err != nil || !decoded.Valid {
-			httpx.WriteJSONResponse(w, http.StatusUnauthorized, httpx.Response{
-				Status: false,
-				Message: "invalid token",
-			})
+			fail(w, err)
 			return
 		}
 		// extract userId
@@ -72,11 +68,11 @@ func AuthenticationMiddleware(userRepository *users.UserRepository, cfg *config.
 		// check if user exists 
 		exists, err := userRepository.CheckUserExistsById(r.Context(), userId)
 		if err != nil {
-			httpx.WriteInternalServerErr(w)
+			fail(w, err)
 			return
 		}
 		if !exists {
-			httpx.WriteJSONResponse(w, http.StatusNotFound, httpx.Response{Status: false, Message: "user not found"})
+			fail(w, ErrUserNotFound)
 			return
 		}
 
