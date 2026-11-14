@@ -1,12 +1,12 @@
 package auth
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jusxtdev/cairn/internal/config"
+	"github.com/jusxtdev/cairn/internal/requestctx"
 	"github.com/jusxtdev/cairn/internal/users"
 )
 
@@ -77,7 +77,7 @@ func AuthenticationMiddleware(userRepository *users.UserRepository, cfg *config.
 		}
 
 		// next
-		ctx := context.WithValue(r.Context(), "userId", userId)
+		ctx := requestctx.WithUserId(r.Context(), userId) 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

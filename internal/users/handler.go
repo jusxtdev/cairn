@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jusxtdev/cairn/internal/httpx"
+	"github.com/jusxtdev/cairn/internal/requestctx"
 )
 
 type Handler struct {
@@ -21,7 +22,7 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 }
 
 func (h *Handler)GetMe(w http.ResponseWriter, r *http.Request) {
-	userId, ok:= r.Context().Value("userId").(string)
+	userId, ok := requestctx.GetUserId(r.Context())
 	if !ok {
 		fail(w, errors.New("user id missing from request context"))
 		return
